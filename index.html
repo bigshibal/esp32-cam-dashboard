@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ESP32 Environmental Monitor</title>
+<style>
+body{
+font-family:Arial;
+max-width:700px;
+margin:auto;
+padding:20px;
+}
+
+.card{
+border:1px solid #ccc;
+border-radius:10px;
+padding:20px;
+margin-bottom:20px;
+}
+
+.big{
+font-size:40px;
+font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<h2>ESP32-CAM Monitoring Dashboard</h2>
+
+<div class="card">
+Humidity
+<div class="big" id="humidity">--</div>
+</div>
+
+<div class="card">
+Temperature
+<div class="big" id="temperature">--</div>
+</div>
+
+<script>
+
+async function loadData(){
+
+const r = await fetch("/.netlify/functions/get-data");
+const data = await r.json();
+
+if(data.length>0){
+
+document.getElementById("temperature").innerText =
+data[0].temperature + " °C";
+
+document.getElementById("humidity").innerText =
+data[0].humidity + " %";
+
+}
+
+}
+
+setInterval(loadData,3000);
+loadData();
+
+</script>
+
+</body>
+</html>
