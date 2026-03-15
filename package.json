@@ -1,0 +1,6 @@
+{
+"name": "esp32-dashboard",
+"dependencies": {
+"pg": "^8.11.0"
+}
+}
