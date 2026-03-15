@@ -3,20 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Envirolog Live Dashboard</title>
+  <title>Envirolog Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body{
       font-family:Arial, sans-serif;
-      max-width:1100px;
+      max-width:1150px;
       margin:20px auto;
       padding:0 16px;
-      background:#f6f8fb;
-      color:#222;
+      background:#0f1117;
+      color:#ffffff;
     }
-    h1{
-      text-align:center;
-      margin-bottom:20px;
+    h1,h2{
+      margin-bottom:16px;
     }
     .grid{
       display:grid;
@@ -25,34 +24,59 @@
       margin-bottom:20px;
     }
     .card{
-      background:white;
-      border-radius:14px;
+      background:#171b22;
+      border-radius:16px;
       padding:20px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.08);
+      box-shadow:0 2px 10px rgba(0,0,0,0.3);
     }
     .label{
+      color:#b8c0cc;
       font-size:14px;
-      color:#666;
       margin-bottom:8px;
     }
     .big{
-      font-size:34px;
+      font-size:32px;
       font-weight:bold;
       line-height:1.2;
     }
-    .chart-card{
-      background:white;
-      border-radius:14px;
+    .chart-card, .table-card{
+      background:#171b22;
+      border-radius:16px;
       padding:20px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.08);
+      box-shadow:0 2px 10px rgba(0,0,0,0.3);
       margin-bottom:20px;
+    }
+    .controls{
+      display:flex;
+      flex-wrap:wrap;
+      gap:16px;
+      margin-bottom:16px;
+      align-items:end;
+    }
+    .control-group{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    select, button{
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid #333;
+      background:#11161d;
+      color:white;
+      min-width:140px;
+      cursor:pointer;
+    }
+    button:hover{
+      background:#1b2330;
     }
     .badge{
       display:inline-block;
-      padding:8px 14px;
+      padding:6px 12px;
       border-radius:999px;
       font-weight:bold;
-      font-size:14px;
+      font-size:12px;
+      text-transform:uppercase;
     }
     .normal{
       background:#e8f7e8;
@@ -62,13 +86,13 @@
       background:#fff4db;
       color:#a56a00;
     }
-    .danger{
+    .critical{
       background:#ffe6e6;
       color:#b42318;
     }
     .offline{
-      background:#ececec;
-      color:#666;
+      background:#e5e7eb;
+      color:#4b5563;
     }
     .status-row{
       display:flex;
@@ -76,38 +100,62 @@
       gap:10px;
       align-items:center;
     }
-    .footer-status{
-      text-align:center;
-      color:#555;
-      margin-top:10px;
-      font-size:14px;
+    .status{
+      color:#b8c0cc;
+      margin-top:12px;
     }
     canvas{
       width:100% !important;
-      height:320px !important;
+      height:340px !important;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:8px;
+    }
+    th, td{
+      text-align:left;
+      padding:12px 10px;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      font-size:14px;
+      vertical-align:middle;
+    }
+    th{
+      color:#cbd5e1;
+    }
+    .table-wrap{
+      overflow-x:auto;
+    }
+    .muted{
+      color:#9ca3af;
+      font-size:13px;
+    }
+    .top-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
     }
   </style>
 </head>
 <body>
 
-  <h1>Envirolog Live Dashboard</h1>
+  <h1>Envirolog Dashboard</h1>
 
   <div class="grid">
     <div class="card">
       <div class="label">Latest Temperature</div>
       <div class="big" id="temperature">-- °C</div>
     </div>
-
     <div class="card">
       <div class="label">Latest Humidity</div>
       <div class="big" id="humidity">-- %</div>
     </div>
-
     <div class="card">
       <div class="label">Device ID</div>
       <div class="big" id="device">--</div>
     </div>
-
     <div class="card">
       <div class="label">Last Update</div>
       <div class="big" id="updated" style="font-size:20px;">--</div>
@@ -124,27 +172,77 @@
   </div>
 
   <div class="chart-card">
-    <h3>Temperature Trend</h3>
-    <canvas id="tempChart"></canvas>
+    <div class="top-row">
+      <h2>Historical Trend</h2>
+      <div class="controls">
+        <div class="control-group">
+          <label for="metricSelect">Metric</label>
+          <select id="metricSelect">
+            <option value="temperature">Temperature</option>
+            <option value="humidity">Humidity</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="pointsSelect">Points</label>
+          <select id="pointsSelect">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="30" selected>30</option>
+            <option value="60">60</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <canvas id="historyChart"></canvas>
+    <div class="status" id="chartStatus">Loading data...</div>
   </div>
 
-  <div class="chart-card">
-    <h3>Humidity Trend</h3>
-    <canvas id="humChart"></canvas>
-  </div>
+  <div class="table-card">
+    <div class="top-row">
+      <div>
+        <h2>Audit Log</h2>
+        <div class="muted">Time-stamped historical records for traceability and review.</div>
+      </div>
+      <button id="exportBtn">Export CSV</button>
+    </div>
 
-  <div class="footer-status" id="status">Loading data...</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Timestamp</th>
+            <th>Device</th>
+            <th>Temperature (°C)</th>
+            <th>Humidity (%)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="auditTableBody">
+          <tr>
+            <td colspan="6" class="muted">Loading log...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <script>
-    const tempCtx = document.getElementById("tempChart").getContext("2d");
-    const humCtx = document.getElementById("humChart").getContext("2d");
+    const ctx = document.getElementById("historyChart").getContext("2d");
+    const metricSelect = document.getElementById("metricSelect");
+    const pointsSelect = document.getElementById("pointsSelect");
+    const exportBtn = document.getElementById("exportBtn");
+    const auditTableBody = document.getElementById("auditTableBody");
 
-    const tempChart = new Chart(tempCtx, {
+    const historyChart = new Chart(ctx, {
       type: "line",
       data: {
         labels: [],
         datasets: [{
-          label: "Temperature (°C)",
+          label: "Value",
           data: [],
           borderWidth: 2,
           tension: 0.25,
@@ -154,36 +252,30 @@
       options: {
         responsive: true,
         animation: false,
+        plugins: {
+          legend: {
+            labels: { color: "#ffffff" }
+          }
+        },
         scales: {
-          y: { beginAtZero: false }
-        }
-      }
-    });
-
-    const humChart = new Chart(humCtx, {
-      type: "line",
-      data: {
-        labels: [],
-        datasets: [{
-          label: "Humidity (%)",
-          data: [],
-          borderWidth: 2,
-          tension: 0.25,
-          fill: false
-        }]
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        scales: {
-          y: { beginAtZero: false }
+          x: {
+            ticks: { color: "#cccccc" },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          },
+          y: {
+            ticks: { color: "#cccccc" },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          }
         }
       }
     });
 
     function formatTime(ts) {
-      const d = new Date(ts);
-      return d.toLocaleTimeString();
+      return new Date(ts).toLocaleTimeString();
+    }
+
+    function formatDateTime(ts) {
+      return new Date(ts).toLocaleString();
     }
 
     function setBadge(id, text, cls) {
@@ -192,10 +284,16 @@
       el.className = `badge ${cls}`;
     }
 
+    function getStatusBadgeClass(status) {
+      if (status === "critical") return "critical";
+      if (status === "warning") return "warning";
+      if (status === "normal") return "normal";
+      return "offline";
+    }
+
     function updateStatusBadges(latest) {
       const latestTime = new Date(latest.created_at).getTime();
-      const now = Date.now();
-      const ageSeconds = (now - latestTime) / 1000;
+      const ageSeconds = (Date.now() - latestTime) / 1000;
 
       if (ageSeconds <= 20) {
         setBadge("sensorStatus", "Sensor Online", "normal");
@@ -213,7 +311,7 @@
       } else if (t < 35) {
         setBadge("tempStatus", "Temp High", "warning");
       } else {
-        setBadge("tempStatus", "Temp Critical", "danger");
+        setBadge("tempStatus", "Temp Critical", "critical");
       }
 
       if (h < 70) {
@@ -221,32 +319,45 @@
       } else if (h < 85) {
         setBadge("humStatus", "Humidity High", "warning");
       } else {
-        setBadge("humStatus", "Humidity Critical", "danger");
+        setBadge("humStatus", "Humidity Critical", "critical");
       }
+    }
+
+    function renderAuditTable(rows) {
+      if (!rows.length) {
+        auditTableBody.innerHTML = `
+          <tr>
+            <td colspan="6" class="muted">No audit records yet.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      auditTableBody.innerHTML = rows.map(row => `
+        <tr>
+          <td>${row.id}</td>
+          <td>${formatDateTime(row.created_at)}</td>
+          <td>${row.device_id || "--"}</td>
+          <td>${Number(row.temperature).toFixed(1)}</td>
+          <td>${Number(row.humidity).toFixed(1)}</td>
+          <td><span class="badge ${getStatusBadgeClass(row.status)}">${row.status || "unknown"}</span></td>
+        </tr>
+      `).join("");
     }
 
     async function loadData() {
       try {
-        const response = await fetch("/.netlify/functions/get-data");
+        const points = pointsSelect.value;
+        const metric = metricSelect.value;
+
+        const response = await fetch(`/.netlify/functions/get-data?limit=${points}`);
         const data = await response.json();
 
-        if (!Array.isArray(data)) {
-          document.getElementById("status").textContent = "Invalid data received";
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById("chartStatus").textContent = "No sensor data yet";
+          renderAuditTable([]);
           return;
         }
-
-        if (data.length === 0) {
-          document.getElementById("status").textContent = "No sensor data yet";
-          setBadge("sensorStatus", "Sensor Offline", "offline");
-          setBadge("tempStatus", "Temp Unknown", "offline");
-          setBadge("humStatus", "Humidity Unknown", "offline");
-          return;
-        }
-
-        const rows = [...data].reverse();
-        const labels = rows.map(row => formatTime(row.created_at));
-        const temps = rows.map(row => Number(row.temperature));
-        const hums = rows.map(row => Number(row.humidity));
 
         const latest = data[0];
 
@@ -260,29 +371,46 @@
           latest.device_id || "--";
 
         document.getElementById("updated").textContent =
-          new Date(latest.created_at).toLocaleString();
+          formatDateTime(latest.created_at);
 
         updateStatusBadges(latest);
 
-        tempChart.data.labels = labels;
-        tempChart.data.datasets[0].data = temps;
-        tempChart.update();
+        const rowsForChart = [...data].reverse();
+        const labels = rowsForChart.map(row => formatTime(row.created_at));
 
-        humChart.data.labels = labels;
-        humChart.data.datasets[0].data = hums;
-        humChart.update();
+        let values = [];
+        let chartLabel = "";
 
-        document.getElementById("status").textContent =
-          `Showing ${data.length} latest readings`;
+        if (metric === "temperature") {
+          values = rowsForChart.map(row => Number(row.temperature));
+          chartLabel = "Temperature (°C)";
+        } else {
+          values = rowsForChart.map(row => Number(row.humidity));
+          chartLabel = "Humidity (%)";
+        }
+
+        historyChart.data.labels = labels;
+        historyChart.data.datasets[0].data = values;
+        historyChart.data.datasets[0].label = chartLabel;
+        historyChart.update();
+
+        renderAuditTable(data);
+
+        document.getElementById("chartStatus").textContent =
+          `Showing ${data.length} latest records`;
       } catch (err) {
-        document.getElementById("status").textContent =
-          "Failed to load dashboard data";
-        setBadge("sensorStatus", "Sensor Offline", "offline");
-        setBadge("tempStatus", "Temp Unknown", "offline");
-        setBadge("humStatus", "Humidity Unknown", "offline");
+        document.getElementById("chartStatus").textContent = "Failed to load dashboard data";
+        renderAuditTable([]);
         console.error(err);
       }
     }
+
+    exportBtn.addEventListener("click", () => {
+      window.open("/.netlify/functions/export-csv?limit=1000", "_blank");
+    });
+
+    metricSelect.addEventListener("change", loadData);
+    pointsSelect.addEventListener("change", loadData);
 
     loadData();
     setInterval(loadData, 5000);
