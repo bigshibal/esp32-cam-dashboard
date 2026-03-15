@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Envirolog Dashboard</title>
+  <title>Envirolog Live Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body{
       font-family:Arial, sans-serif;
-      max-width:1000px;
+      max-width:1100px;
       margin:20px auto;
       padding:0 16px;
-      background:#f7f7f7;
+      background:#f6f8fb;
+      color:#222;
     }
     h1{
       text-align:center;
+      margin-bottom:20px;
     }
     .grid{
       display:grid;
@@ -24,9 +26,9 @@
     }
     .card{
       background:white;
-      border-radius:12px;
+      border-radius:14px;
       padding:20px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+      box-shadow:0 2px 10px rgba(0,0,0,0.08);
     }
     .label{
       font-size:14px;
@@ -34,20 +36,51 @@
       margin-bottom:8px;
     }
     .big{
-      font-size:36px;
+      font-size:34px;
       font-weight:bold;
+      line-height:1.2;
     }
     .chart-card{
       background:white;
-      border-radius:12px;
+      border-radius:14px;
       padding:20px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+      box-shadow:0 2px 10px rgba(0,0,0,0.08);
       margin-bottom:20px;
     }
-    .status{
+    .badge{
+      display:inline-block;
+      padding:8px 14px;
+      border-radius:999px;
+      font-weight:bold;
+      font-size:14px;
+    }
+    .normal{
+      background:#e8f7e8;
+      color:#1d7a2f;
+    }
+    .warning{
+      background:#fff4db;
+      color:#a56a00;
+    }
+    .danger{
+      background:#ffe6e6;
+      color:#b42318;
+    }
+    .offline{
+      background:#ececec;
+      color:#666;
+    }
+    .status-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+    }
+    .footer-status{
       text-align:center;
       color:#555;
       margin-top:10px;
+      font-size:14px;
     }
     canvas{
       width:100% !important;
@@ -77,7 +110,16 @@
 
     <div class="card">
       <div class="label">Last Update</div>
-      <div class="big" id="updated" style="font-size:22px;">--</div>
+      <div class="big" id="updated" style="font-size:20px;">--</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div class="label">System Status</div>
+    <div class="status-row">
+      <span class="badge offline" id="sensorStatus">Sensor Offline</span>
+      <span class="badge offline" id="tempStatus">Temp Unknown</span>
+      <span class="badge offline" id="humStatus">Humidity Unknown</span>
     </div>
   </div>
 
@@ -91,7 +133,7 @@
     <canvas id="humChart"></canvas>
   </div>
 
-  <div class="status" id="status">Loading data...</div>
+  <div class="footer-status" id="status">Loading data...</div>
 
   <script>
     const tempCtx = document.getElementById("tempChart").getContext("2d");
@@ -105,7 +147,8 @@
           label: "Temperature (°C)",
           data: [],
           borderWidth: 2,
-          tension: 0.25
+          tension: 0.25,
+          fill: false
         }]
       },
       options: {
@@ -125,7 +168,8 @@
           label: "Humidity (%)",
           data: [],
           borderWidth: 2,
-          tension: 0.25
+          tension: 0.25,
+          fill: false
         }]
       },
       options: {
@@ -142,6 +186,45 @@
       return d.toLocaleTimeString();
     }
 
+    function setBadge(id, text, cls) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = `badge ${cls}`;
+    }
+
+    function updateStatusBadges(latest) {
+      const latestTime = new Date(latest.created_at).getTime();
+      const now = Date.now();
+      const ageSeconds = (now - latestTime) / 1000;
+
+      if (ageSeconds <= 20) {
+        setBadge("sensorStatus", "Sensor Online", "normal");
+      } else if (ageSeconds <= 60) {
+        setBadge("sensorStatus", "Sensor Delayed", "warning");
+      } else {
+        setBadge("sensorStatus", "Sensor Offline", "offline");
+      }
+
+      const t = Number(latest.temperature);
+      const h = Number(latest.humidity);
+
+      if (t < 30) {
+        setBadge("tempStatus", "Temp Normal", "normal");
+      } else if (t < 35) {
+        setBadge("tempStatus", "Temp High", "warning");
+      } else {
+        setBadge("tempStatus", "Temp Critical", "danger");
+      }
+
+      if (h < 70) {
+        setBadge("humStatus", "Humidity Normal", "normal");
+      } else if (h < 85) {
+        setBadge("humStatus", "Humidity High", "warning");
+      } else {
+        setBadge("humStatus", "Humidity Critical", "danger");
+      }
+    }
+
     async function loadData() {
       try {
         const response = await fetch("/.netlify/functions/get-data");
@@ -154,11 +237,13 @@
 
         if (data.length === 0) {
           document.getElementById("status").textContent = "No sensor data yet";
+          setBadge("sensorStatus", "Sensor Offline", "offline");
+          setBadge("tempStatus", "Temp Unknown", "offline");
+          setBadge("humStatus", "Humidity Unknown", "offline");
           return;
         }
 
         const rows = [...data].reverse();
-
         const labels = rows.map(row => formatTime(row.created_at));
         const temps = rows.map(row => Number(row.temperature));
         const hums = rows.map(row => Number(row.humidity));
@@ -177,6 +262,8 @@
         document.getElementById("updated").textContent =
           new Date(latest.created_at).toLocaleString();
 
+        updateStatusBadges(latest);
+
         tempChart.data.labels = labels;
         tempChart.data.datasets[0].data = temps;
         tempChart.update();
@@ -190,6 +277,9 @@
       } catch (err) {
         document.getElementById("status").textContent =
           "Failed to load dashboard data";
+        setBadge("sensorStatus", "Sensor Offline", "offline");
+        setBadge("tempStatus", "Temp Unknown", "offline");
+        setBadge("humStatus", "Humidity Unknown", "offline");
         console.error(err);
       }
     }
