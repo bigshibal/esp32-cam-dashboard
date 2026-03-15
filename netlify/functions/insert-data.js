@@ -1,5 +1,11 @@
 import { Client } from "pg";
 
+function getStatus(temperature, humidity) {
+  if (temperature > 35 || humidity > 85) return "critical";
+  if (temperature >= 30 || humidity >= 70) return "warning";
+  return "normal";
+}
+
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response(
@@ -27,6 +33,8 @@ export default async (req) => {
       );
     }
 
+    const status = getStatus(Number(temperature), Number(humidity));
+
     client = new Client({
       connectionString: process.env.NETLIFY_DATABASE_URL
     });
@@ -36,18 +44,19 @@ export default async (req) => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS sensor_data (
         id SERIAL PRIMARY KEY,
-        device_id TEXT,
-        temperature REAL,
-        humidity REAL,
+        device_id TEXT NOT NULL,
+        temperature REAL NOT NULL,
+        humidity REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'normal',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     const result = await client.query(
-      `INSERT INTO sensor_data (device_id, temperature, humidity)
-       VALUES ($1, $2, $3)
+      `INSERT INTO sensor_data (device_id, temperature, humidity, status)
+       VALUES ($1, $2, $3, $4)
        RETURNING *;`,
-      [device_id, temperature, humidity]
+      [device_id, temperature, humidity, status]
     );
 
     return new Response(
