@@ -52,6 +52,11 @@ export default async (req) => {
       );
     `);
 
+    await client.query(`
+      ALTER TABLE sensor_data
+      ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'normal';
+    `);
+
     const result = await client.query(
       `INSERT INTO sensor_data (device_id, temperature, humidity, status)
        VALUES ($1, $2, $3, $4)
