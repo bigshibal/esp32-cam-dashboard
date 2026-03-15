@@ -1,66 +1,201 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>ESP32 Environmental Monitor</title>
-<style>
-body{
-font-family:Arial;
-max-width:700px;
-margin:auto;
-padding:20px;
-}
-
-.card{
-border:1px solid #ccc;
-border-radius:10px;
-padding:20px;
-margin-bottom:20px;
-}
-
-.big{
-font-size:40px;
-font-weight:bold;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Envirolog Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{
+      font-family:Arial, sans-serif;
+      max-width:1000px;
+      margin:20px auto;
+      padding:0 16px;
+      background:#f7f7f7;
+    }
+    h1{
+      text-align:center;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+      gap:16px;
+      margin-bottom:20px;
+    }
+    .card{
+      background:white;
+      border-radius:12px;
+      padding:20px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    }
+    .label{
+      font-size:14px;
+      color:#666;
+      margin-bottom:8px;
+    }
+    .big{
+      font-size:36px;
+      font-weight:bold;
+    }
+    .chart-card{
+      background:white;
+      border-radius:12px;
+      padding:20px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom:20px;
+    }
+    .status{
+      text-align:center;
+      color:#555;
+      margin-top:10px;
+    }
+    canvas{
+      width:100% !important;
+      height:320px !important;
+    }
+  </style>
 </head>
-
 <body>
 
-<h2>ESP32-CAM Monitoring Dashboard</h2>
+  <h1>Envirolog Live Dashboard</h1>
 
-<div class="card">
-Humidity
-<div class="big" id="humidity">--</div>
-</div>
+  <div class="grid">
+    <div class="card">
+      <div class="label">Latest Temperature</div>
+      <div class="big" id="temperature">-- °C</div>
+    </div>
 
-<div class="card">
-Temperature
-<div class="big" id="temperature">--</div>
-</div>
+    <div class="card">
+      <div class="label">Latest Humidity</div>
+      <div class="big" id="humidity">-- %</div>
+    </div>
 
-<script>
+    <div class="card">
+      <div class="label">Device ID</div>
+      <div class="big" id="device">--</div>
+    </div>
 
-async function loadData(){
+    <div class="card">
+      <div class="label">Last Update</div>
+      <div class="big" id="updated" style="font-size:22px;">--</div>
+    </div>
+  </div>
 
-const r = await fetch("/.netlify/functions/get-data");
-const data = await r.json();
+  <div class="chart-card">
+    <h3>Temperature Trend</h3>
+    <canvas id="tempChart"></canvas>
+  </div>
 
-if(data.length>0){
+  <div class="chart-card">
+    <h3>Humidity Trend</h3>
+    <canvas id="humChart"></canvas>
+  </div>
 
-document.getElementById("temperature").innerText =
-data[0].temperature + " °C";
+  <div class="status" id="status">Loading data...</div>
 
-document.getElementById("humidity").innerText =
-data[0].humidity + " %";
+  <script>
+    const tempCtx = document.getElementById("tempChart").getContext("2d");
+    const humCtx = document.getElementById("humChart").getContext("2d");
 
-}
+    const tempChart = new Chart(tempCtx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [{
+          label: "Temperature (°C)",
+          data: [],
+          borderWidth: 2,
+          tension: 0.25
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          y: { beginAtZero: false }
+        }
+      }
+    });
 
-}
+    const humChart = new Chart(humCtx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [{
+          label: "Humidity (%)",
+          data: [],
+          borderWidth: 2,
+          tension: 0.25
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          y: { beginAtZero: false }
+        }
+      }
+    });
 
-setInterval(loadData,3000);
-loadData();
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleTimeString();
+    }
 
-</script>
+    async function loadData() {
+      try {
+        const response = await fetch("/.netlify/functions/get-data");
+        const data = await response.json();
 
+        if (!Array.isArray(data)) {
+          document.getElementById("status").textContent = "Invalid data received";
+          return;
+        }
+
+        if (data.length === 0) {
+          document.getElementById("status").textContent = "No sensor data yet";
+          return;
+        }
+
+        const rows = [...data].reverse();
+
+        const labels = rows.map(row => formatTime(row.created_at));
+        const temps = rows.map(row => Number(row.temperature));
+        const hums = rows.map(row => Number(row.humidity));
+
+        const latest = data[0];
+
+        document.getElementById("temperature").textContent =
+          `${Number(latest.temperature).toFixed(1)} °C`;
+
+        document.getElementById("humidity").textContent =
+          `${Number(latest.humidity).toFixed(1)} %`;
+
+        document.getElementById("device").textContent =
+          latest.device_id || "--";
+
+        document.getElementById("updated").textContent =
+          new Date(latest.created_at).toLocaleString();
+
+        tempChart.data.labels = labels;
+        tempChart.data.datasets[0].data = temps;
+        tempChart.update();
+
+        humChart.data.labels = labels;
+        humChart.data.datasets[0].data = hums;
+        humChart.update();
+
+        document.getElementById("status").textContent =
+          `Showing ${data.length} latest readings`;
+      } catch (err) {
+        document.getElementById("status").textContent =
+          "Failed to load dashboard data";
+        console.error(err);
+      }
+    }
+
+    loadData();
+    setInterval(loadData, 5000);
+  </script>
 </body>
 </html>
